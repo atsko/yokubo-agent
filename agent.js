@@ -37,7 +37,7 @@ const CONFIG = {
     "コーヒー焙煎と理論",
   ],
   model: "claude-sonnet-4-6",
-  tickMinutes: 5,          // 欲求更新の間隔
+  tickMinutes: 30,          // 欲求更新の間隔
   threshold: 70,           // 自律行動が起きる欲求ライン
   cooldownMinutes: 20,     // 行動間の最短間隔
   maxActionsPerDay: 12,    // 1日の行動上限(コスト暴走防止)

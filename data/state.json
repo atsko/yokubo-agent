@@ -1,0 +1,20 @@
+{
+  "desires": {
+    "curiosity": 60.5,
+    "boredom": 31.2,
+    "social": 25.3,
+    "energy": 100
+  },
+  "memories": [],
+  "topics": [],
+  "lastAuto": 0,
+  "lastTick": 1784380377156,
+  "daily": {
+    "date": "2026-07-18",
+    "count": 0
+  },
+  "usage": {
+    "in": 0,
+    "out": 0
+  }
+}

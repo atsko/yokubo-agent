@@ -1,9 +1,9 @@
 {
   "desires": {
-    "curiosity": 62.5,
-    "boredom": 14.999999999999993,
-    "social": 22.5,
-    "energy": 92
+    "curiosity": 68.5,
+    "boredom": 29.39999999999999,
+    "social": 26.1,
+    "energy": 100
   },
   "memories": [
     {
@@ -14,7 +14,7 @@
   ],
   "topics": [],
   "lastAuto": 1784390347250,
-  "lastTick": 1784390347249,
+  "lastTick": 1784394433482,
   "daily": {
     "date": "2026-07-19",
     "count": 1

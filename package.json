@@ -1,0 +1,17 @@
+{
+  "name": "yokubo-agent",
+  "version": "1.0.0",
+  "description": "ホメオスタシス型 自律リサーチエージェント(欲求駆動でClaudeが自ら調べて整理する)",
+  "type": "module",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js",
+    "once": "node agent.js --once",
+    "status": "node agent.js --status",
+    "reset": "node agent.js --reset",
+    "dry": "DRY_RUN=1 node agent.js --once"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  }
+}

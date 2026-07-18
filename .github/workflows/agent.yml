@@ -1,0 +1,54 @@
+name: yokubo-agent
+
+on:
+  schedule:
+    # 5分ごと。※GitHubのcronは高負荷時に遅延・スキップします(数分〜数十分ずれることも)。
+    # agent.js は経過時間ベースで欲求を進めるので、間隔がブレても破綻しません。
+    # コスト重視なら "*/15 * * * *" や "*/30 * * * *" に緩めてもほぼ同じ挙動になります。
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}   # 手動実行(Actionsタブの Run workflow ボタン)
+
+# 状態ファイルへの書き込みが衝突しないよう、同時実行を1本に制限
+concurrency:
+  group: yokubo-agent
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # data/ をリポジトリにコミットして状態を永続化するため
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: リポジトリを取得(前回までの data/ を含む)
+        uses: actions/checkout@v4
+
+      - name: Node.js を用意
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 依存関係をインストール
+        run: npm ci
+
+      - name: エージェントを1ティック実行
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TZ: Asia/Tokyo   # 夜間モード(22-8時)を日本時間で判定させる
+        run: node agent.js --tick
+
+      - name: 状態とノートをコミット
+        run: |
+          git config user.name  "yokubo-agent[bot]"
+          git config user.email "yokubo-agent@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "変化なし(行動しなかった)ためコミットせず"
+          else
+            git commit -m "🥚 tick $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
+            # 別ランと衝突した場合に備えてリベースしてから push
+            git pull --rebase --autostash origin ${GITHUB_REF_NAME} || true
+            git push
+          fi

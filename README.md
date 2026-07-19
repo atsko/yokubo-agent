@@ -35,7 +35,7 @@ npm start          # ③ 常駐モード開始(Ctrl+Cで停止)
 
 | コマンド | 動作 |
 |---|---|
-| `npm start` | 常駐。30分ごとに欲求が変動し、自律行動する |
+| `npm start` | 常駐。5分ごとに欲求が変動し、自律行動する |
 | `npm run status` | いまの欲求・本日の行動数・累計トークンを表示 |
 | `npm run once` | しきい値を無視して即1回行動(テスト用) |
 | `node agent.js --tick` | 欲求を進め、条件を満たせば1回だけ行動して終了(cron/Actions用) |
@@ -52,8 +52,8 @@ npm start          # ③ 常駐モード開始(Ctrl+Cで停止)
 
 | 項目 | 意味 | 初期値 |
 |---|---|---|
-| `interests` | 興味分野。調査の方向性がここで決まる | コーヒー焙煎 / コーヒー抽出 |
-| `tickMinutes` | 欲求更新の間隔 | 30分 |
+| `interests` | 興味分野。調査の方向性がここで決まる | コーヒー焙煎 / 英語学習 / AIエージェント |
+| `tickMinutes` | 欲求更新の間隔 | 5分 |
 | `threshold` | 自律行動が起きるライン | 70 |
 | `cooldownMinutes` | 行動間の最短間隔 | 20分 |
 | `maxActionsPerDay` | 1日の行動上限(コスト安全弁) | 12回 |
@@ -62,6 +62,36 @@ npm start          # ③ 常駐モード開始(Ctrl+Cで停止)
 | `nightDrift` | 夜間の欲求変化(体力はプラス=睡眠回復) | — |
 
 ※ 時刻は実行マシンのローカル時刻です。テスト用に `FAKE_HOUR=23 npm run dry` のように時間帯を偽装できます。
+
+## 連携(任意):Notion と Gmail
+
+どちらも**Secretを設定したときだけ有効**になります。未設定ならローカルの `data/` に書くだけで通常どおり動きます。
+
+### notes を Notion に同期する
+
+調査・考察・夜間整理をするたびに、指定した Notion ページの末尾へ自動追記します。
+
+1. https://www.notion.so/my-integrations で「New integration」を作成 → **Internal Integration Secret**(`secret_...` / `ntn_...`)をコピー
+2. 追記先にしたい Notion ページを開き、右上「•••」→ Connections → 作った連携を追加(これを忘れると403になります)
+3. そのページURL末尾の32桁(例: `.../ページ名-`**`1a2b3c...`**)がページID
+4. GitHub の Secrets に登録:
+   - `NOTION_TOKEN` = さきほどのシークレット
+   - `NOTION_PAGE_ID` = 32桁のページID
+
+### report を Gmail で自分に送る
+
+日報(report行動)のたびに、指定アドレスへメールが届きます。
+
+1. Googleアカウントで**2段階認証を有効化**(アプリパスワードの前提条件)
+2. https://myaccount.google.com/apppasswords で「アプリパスワード」を生成 → 表示される16桁をコピー
+3. GitHub の Secrets に登録:
+   - `GMAIL_USER` = 送信元のGmailアドレス(例: `you@gmail.com`)
+   - `GMAIL_APP_PASSWORD` = 16桁のアプリパスワード(空白は詰めてOK)
+   - `REPORT_TO` =(任意)別の宛先に送りたい場合のみ。未設定なら自分宛て
+
+> アプリパスワードは通常のログインパスワードとは別物です。GitHub Secrets 以外には保存しないでください。
+
+`npm run status` の「連携」行で、いまON/OFFどちらかを確認できます。
 
 ## 常駐化(ずっと生かしておく)
 

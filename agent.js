@@ -49,6 +49,12 @@ const CONFIG = {
   night: { start: 22, end: 8, maxDigests: 2 },
   // 夜間の欲求変化: 心は静かに、体力はぐんぐん回復(睡眠)
   nightDrift: { curiosity: 0.5, boredom: 1.2, social: 0.3, energy: 4.0 },
+  // ↓ パーソナルコーチ化(指示書フェーズ3)。ファイルやフォルダが無ければ従来どおり動く
+  contextFile: path.join(__dirname, "PERSONAL_CONTEXT.md"), // weekly.js が毎週更新
+  summariesDir: path.join(__dirname, "summaries"),          // 週次サマリー置き場
+  roastDir: process.env.ROAST_DIR ||
+    path.join(__dirname, "..", "コーヒー焙煎シュミレーター", "焙煎データ"),
+  maxRoastSyncPerTick: 3, // 焙煎CSVの新着を1tickで同期する上限
   dataDir: path.join(__dirname, "data"),
 };
 
@@ -186,7 +192,9 @@ function dryAnswer(prompt, webSearch) {
 // ---------------- Notion 連携(任意 / env が無ければ自動スキップ)----------------
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const NOTION_PAGE_ID = process.env.NOTION_PAGE_ID;
+const NOTION_DB_ID = process.env.NOTION_DB_ID; // 学習ログDB(焙煎コレクター用・任意)
 const notionEnabled = () => Boolean(NOTION_TOKEN && NOTION_PAGE_ID);
+const roastDbEnabled = () => Boolean(NOTION_TOKEN && NOTION_DB_ID);
 
 function chunkText(str, size = 1900) {
   const out = [];
@@ -257,6 +265,126 @@ async function sendReportEmail(text) {
   log(`  📧 ${REPORT_TO} に報告を送信した`);
 }
 
+// ---------------- コーチ化ヘルパー(指示書フェーズ3 / ファイルが無ければ空文字) ----------------
+function readIfExists(p, cap = 0) {
+  try {
+    const t = fs.readFileSync(p, "utf8");
+    return cap ? t.slice(0, cap) : t;
+  } catch { return ""; }
+}
+
+// weekly.js が維持する PERSONAL_CONTEXT.md(飼い主の現在地)をプロンプトに注入する
+function ownerContextBlock() {
+  const ctx = readIfExists(CONFIG.contextFile, 1500);
+  return ctx
+    ? `\n\n${CONFIG.owner}さんの現在地(週次自動更新の PERSONAL_CONTEXT.md より):\n---\n${ctx}\n---`
+    : "";
+}
+
+// summaries/ の最新サマリーから「次の一手」節を抜き出す(日報のコーチング用)
+function latestNextMoves() {
+  try {
+    const files = fs.readdirSync(CONFIG.summariesDir).filter((f) => f.endsWith(".md")).sort();
+    if (!files.length) return "";
+    const t = fs.readFileSync(path.join(CONFIG.summariesDir, files.at(-1)), "utf8");
+    const m = t.match(/次の一手[\s\S]{0,500}/);
+    return m ? m[0] : "";
+  } catch { return ""; }
+}
+
+// ---------------- 焙煎CSVコレクター(指示書フェーズ3) ----------------
+// 焙煎データフォルダの新着CSVを1行サマリーにして学習ログDBへ送る。
+// フォルダが無い環境(GitHub Actions等)や NOTION_DB_ID 未設定なら静かにスキップ。
+const LOG_PROPS = { date: "日付", source: "source", type: "type", title: "タイトル", body: "本文", tags: "タグ" }; // 実DBと違う場合はここを直す(weekly.js と共通)
+
+function parseRoastCsv(filePath) {
+  const rows = fs.readFileSync(filePath, "utf8").split(/\r?\n/).map((l) => l.split(","));
+  const cell = (r, c) => (rows[r] && rows[r][c] ? rows[r][c].trim() : "");
+  const findRow = (label) => rows.findIndex((r) => (r[0] || "").trim() === label);
+  const name = cell(2, 0);   // 例: "38th Roast"
+  const bean = cell(4, 0);   // 例: "Guatemala El Injerto Bourbon 100%"
+  const fc = findRow("1st Crack");
+  const firstCrack = fc >= 0 ? cell(fc + 2, 2) : "-"; // ラベルの2行下がデータ行
+  const yw = findRow("Yellowing");
+  const yellowing = yw >= 0 ? cell(yw + 1, 2) : "-";
+  const tl = findRow("Timeline");
+  let total = "-", endTemp = "-";
+  if (tl >= 0) {
+    for (let i = rows.length - 1; i > tl; i--) {
+      // 末尾にはゼロ埋めの終端マーカー行があるため、温度>0の最終データ行を採用する
+      if (rows[i] && rows[i][1] && /^\d+$/.test(rows[i][1].trim()) && parseFloat(rows[i][3]) > 0) {
+        total = cell(i, 2); endTemp = cell(i, 3); break; // = 総時間・終了温度(IBTS)
+      }
+    }
+  }
+  const toSec = (t) => {
+    const m = /^(\d+):(\d{2})$/.exec(t || "");
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const fcS = toSec(firstCrack), totS = toSec(total);
+  const dtr = fcS && totS && totS > fcS ? `${(((totS - fcS) / totS) * 100).toFixed(1)}%` : "-";
+  return { name, bean, firstCrack, yellowing, total, endTemp, dtr };
+}
+
+function roastLine(r) {
+  return `${r.bean || "?"} / 総時間 ${r.total} / イエロー ${r.yellowing} / 1ハゼ ${r.firstCrack} / DTR ${r.dtr} / 終了温度(IBTS) ${r.endTemp}℃`;
+}
+
+async function notionDbCreate(dateStr, title, body, tags) {
+  const res = await fetch("https://api.notion.com/v1/pages", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${NOTION_TOKEN}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      parent: { database_id: NOTION_DB_ID },
+      properties: {
+        [LOG_PROPS.title]: { title: [{ text: { content: title.slice(0, 200) } }] },
+        [LOG_PROPS.date]: { date: { start: dateStr } },
+        [LOG_PROPS.source]: { select: { name: "roasting" } },
+        [LOG_PROPS.type]: { select: { name: "roast_log" } },
+        [LOG_PROPS.body]: { rich_text: chunkText(body).map((c) => ({ text: { content: c } })) },
+        [LOG_PROPS.tags]: { multi_select: tags.map((name) => ({ name })) },
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`Notion DB ${res.status}: ${(await res.text()).slice(0, 160)}`);
+}
+
+async function collectRoasts(s) {
+  let files = [];
+  try {
+    files = fs.readdirSync(CONFIG.roastDir).filter((f) => f.toLowerCase().endsWith(".csv")).sort();
+  } catch { return; } // フォルダが無ければ何もしない
+  if (!s.seenRoasts) {
+    // 初回: 既存分は既知として登録だけ行い、一気に送らない(38本バーストの防止)
+    s.seenRoasts = files;
+    if (files.length) log(`☕ 焙煎コレクター初期化: 既存${files.length}本を既知として登録(今後の新着から同期)`);
+    return;
+  }
+  const fresh = files.filter((f) => !s.seenRoasts.includes(f)).slice(0, CONFIG.maxRoastSyncPerTick);
+  for (const f of fresh) {
+    try {
+      const r = parseRoastCsv(path.join(CONFIG.roastDir, f));
+      const dateStr = (f.match(/^\d{4}-\d{2}-\d{2}/) || [today()])[0];
+      const title = r.name || f.replace(/\.csv$/i, "");
+      const line = roastLine(r);
+      log(`☕ 焙煎CSV新着: ${f} → ${line}`);
+      if (DRY) log("  [DRY] 学習ログDBに登録(スキップ)");
+      else if (roastDbEnabled()) { await notionDbCreate(dateStr, title, line, ["焙煎"]); log("  ☁️ 学習ログDBに登録した"); }
+      else log("  (NOTION_DB_ID 未設定のためDB登録はスキップ)");
+      s.seenRoasts.push(f);
+      remember(s, "焙煎", `${title} を学習ログに記録した`);
+    } catch (e) {
+      log(`  ⚠️ 焙煎CSV処理に失敗(${f}): ${e.message || e}`);
+      s.seenRoasts.push(f); // 壊れたファイルで無限リトライしない
+    }
+  }
+  if (s.seenRoasts.length > 200) s.seenRoasts = s.seenRoasts.slice(-200);
+}
+
 // ---------------- ペルソナ & 意思決定 ----------------
 function personaBlock(s) {
   const mems = s.memories.slice(-10).map((m) => `・[${m.tag}] ${m.text}`).join("\n") || "・(まだない)";
@@ -277,8 +405,10 @@ function personaBlock(s) {
 async function decide(s) {
   const prompt =
     personaBlock(s) +
+    ownerContextBlock() +
     `\n\nいちばん強い欲求に従って、次の行動を1つだけ選んでください。体力が${CONFIG.lowEnergy}未満なら必ず"rest"。\n` +
-    `- "research": 興味分野に関連して、いま気になる未調査テーマを自分で1つ決めてWebで調べる(好奇心を満たす)\n` +
+    `- "research": 興味分野に関連して、いま気になる未調査テーマを自分で1つ決めてWebで調べる(好奇心を満たす)。` +
+    `${CONFIG.owner}さんの現在地がわかる場合は、停滞している領域に効くテーマを優先する\n` +
     `- "digest": これまでのノートを読み返し、テーマ間のつながりや気づきを短い考察にまとめる(退屈を解消)\n` +
     `- "report": ${CONFIG.owner}さんに近況と学びのハイライトを報告する(社交欲を満たす)\n` +
     `- "rest": 休む(体力回復)\n\n` +
@@ -352,10 +482,14 @@ async function doDigest(s, night = false) {
 
 async function doReport(s) {
   log("✉️  日報を作成中…");
+  const moves = latestNextMoves();
   const prompt =
     personaBlock(s) +
+    (moves ? `\n\n直近の週次サマリーより:\n${moves}\n` : "") +
     `\n\n${CONFIG.owner}さんへの短い報告を書いてください。` +
-    `最近やったこと・いちばん面白かった学び・${CONFIG.owner}さんへの質問1つ、を150〜250字で。本文のみ出力。`;
+    `最近やったこと・いちばん面白かった学び・${CONFIG.owner}さんへの質問1つ、を150〜250字で。` +
+    (moves ? `週次の「次の一手」の進み具合に触れる一言も添えてください。` : "") +
+    `本文のみ出力。`;
   const text = await ask(s, prompt, { maxTokens: 600 });
   fs.appendFileSync(FILES.report, `\n## ${stamp()}\n\n${text.trim()}\n\n---\n`);
   s.desires.social = clamp(s.desires.social - 50);
@@ -461,6 +595,7 @@ async function act(s, force = false) {
 async function tick(force = false) {
   const s = loadState();
   driftDesires(s);
+  await collectRoasts(s); // 焙煎CSVの新着チェック(LLM不使用・軽量)
   await act(s, force);
   saveState(s);
 }
@@ -482,6 +617,10 @@ function printStatus() {
   console.log(
     "連携      :",
     `Notion ${notionEnabled() ? "ON" : "off"} / Gmail ${emailEnabled() ? "ON→" + REPORT_TO : "off"}`
+  );
+  console.log(
+    "コーチ    :",
+    `現在地 ${fs.existsSync(CONFIG.contextFile) ? "ON" : "off"} / 焙煎CSV ${fs.existsSync(CONFIG.roastDir) ? "監視中" : "off"} / 学習ログDB ${roastDbEnabled() ? "ON" : "off"}`
   );
   console.log("直近の行動:");
   for (const m of s.memories.slice(-5)) {

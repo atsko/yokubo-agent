@@ -93,6 +93,20 @@ npm start          # ③ 常駐モード開始(Ctrl+Cで停止)
 
 `npm run status` の「連携」行で、いまON/OFFどちらかを確認できます。
 
+## 週次統合とコーチ化(weekly.js)
+
+`パーソナルコーチ化_指示書.md`(Projects直下)フェーズ1〜3の実装です。
+
+```bash
+npm run weekly:dry   # APIキー不要の配線テスト(生成物は data/weekly-dry/ に隔離)
+node weekly.js       # 本番: Notion学習ログDBの直近7日を統合
+```
+
+- 出力: 週次サマリー(Notionに `type=weekly_summary` +`summaries/YYYY-MM-DD.md`)と、`PERSONAL_CONTEXT.md`(任意のAIに貼れる「携帯できる自分」)の再生成
+- `.github/workflows/weekly.yml` が毎週日曜21時(JST)に自動実行し、結果をコミット
+- 追加Secrets: `NOTION_DB_ID`(学習ログDBのID)。LLMキーは `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY` のどれか1つでよい(この優先順で自動選択。モデルは `WEEKLY_MODEL` で上書き可)
+- agent.js のコーチ化: `PERSONAL_CONTEXT.md` があると調査テーマ選びが「飼い主の停滞領域」寄りになり、日報が週次の「次の一手」に触れる。`焙煎データ/` の新着CSVは1行サマリーにして学習ログDBへ自動登録(初回は既存分を既知として登録するだけで送信しない)。どれも無ければ従来どおり動く
+
 ## 常駐化(ずっと生かしておく)
 
 3通りあります。**PCを常時起動できないなら GitHub Actions が手軽**です。

@@ -9,7 +9,9 @@
     "once": "node agent.js --once",
     "status": "node agent.js --status",
     "reset": "node agent.js --reset",
-    "dry": "DRY_RUN=1 node agent.js --once"
+    "dry": "DRY_RUN=1 node agent.js --once",
+    "weekly": "node weekly.js",
+    "weekly:dry": "DRY_RUN=1 node weekly.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -1,0 +1,45 @@
+# 週次統合(パーソナルコーチ化_指示書.md フェーズ1+2)
+# 毎週日曜 12:00 UTC = 21:00 JST に weekly.js を実行し、
+# summaries/ と PERSONAL_CONTEXT.md の変更をコミットする。
+# 必要な Secrets: NOTION_TOKEN, NOTION_DB_ID, ANTHROPIC_API_KEY(またはGEMINI/OPENAI)
+name: weekly-digest
+
+on:
+  schedule:
+    - cron: "0 12 * * 0" # 日曜 21:00 JST(GitHubのcronは数十分遅れることがある)
+  workflow_dispatch: # Actionsタブから手動実行も可(初回確認用)
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Run weekly digest
+        run: node weekly.js
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DB_ID: ${{ secrets.NOTION_DB_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          WEEKLY_MODEL: ${{ vars.WEEKLY_MODEL }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          REPORT_TO: ${{ secrets.REPORT_TO }}
+
+      - name: Commit results
+        run: |
+          git config user.name "yokubo-weekly"
+          git config user.email "actions@users.noreply.github.com"
+          git add summaries/ PERSONAL_CONTEXT.md
+          git diff --cached --quiet || git commit -m "weekly: $(date -u +%F) のサマリーとコンテキスト更新"
+          git push

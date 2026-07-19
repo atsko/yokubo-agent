@@ -1,7 +1,7 @@
 {
   "desires": {
     "curiosity": 100,
-    "boredom": 93.248604,
+    "boredom": 100,
     "social": 100,
     "energy": 100
   },
@@ -46,7 +46,7 @@
     "SCAブリューイングコントロールチャートの基本構造と抽出収率・濃度の関係"
   ],
   "lastAuto": 1784473969822,
-  "lastTick": 1784492688800,
+  "lastTick": 1784495650954,
   "daily": {
     "date": "2026-07-20",
     "count": 1

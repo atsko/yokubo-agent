@@ -42,4 +42,6 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add summaries/ PERSONAL_CONTEXT.md
           git diff --cached --quiet || git commit -m "weekly: $(date -u +%F) のサマリーとコンテキスト更新"
+          # agent.yml の tick と衝突した場合に備えてリベースしてから push
+          git pull --rebase --autostash origin ${GITHUB_REF_NAME} || true
           git push

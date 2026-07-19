@@ -20,6 +20,7 @@
    ============================================================ */
 
 import Anthropic from "@anthropic-ai/sdk";
+import nodemailer from "nodemailer";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,8 +34,8 @@ const CONFIG = {
   // ↓ エージェントの興味分野。ここを書き換えると調査の方向が変わる
   interests: [
     "スペシャルティコーヒー",
-    "コーヒー抽出と理論",
     "コーヒー焙煎と理論",
+    "コーヒー抽出と理論",
   ],
   model: "claude-sonnet-4-6",
   tickMinutes: 5,          // 欲求更新の間隔
@@ -182,6 +183,80 @@ function dryAnswer(prompt, webSearch) {
   return "(DRY_RUNダミー応答)ノートを読み返した。焙煎と英語学習は「反復と観察」という点で似ている気がする。";
 }
 
+// ---------------- Notion 連携(任意 / env が無ければ自動スキップ)----------------
+const NOTION_TOKEN = process.env.NOTION_TOKEN;
+const NOTION_PAGE_ID = process.env.NOTION_PAGE_ID;
+const notionEnabled = () => Boolean(NOTION_TOKEN && NOTION_PAGE_ID);
+
+function chunkText(str, size = 1900) {
+  const out = [];
+  for (let i = 0; i < str.length; i += size) out.push(str.slice(i, i + size));
+  return out.length ? out : [""];
+}
+
+// notes.md への追記内容を、指定した Notion ページの末尾にブロックとして追記する
+async function notionAppend(title, body) {
+  if (!notionEnabled()) return;
+  if (DRY) { log("  [DRY] Notion に追記(スキップ)"); return; }
+  const children = [
+    {
+      object: "block", type: "heading_2",
+      heading_2: { rich_text: [{ type: "text", text: { content: `${stamp()} — ${title}`.slice(0, 2000) } }] },
+    },
+    ...chunkText(body).map((c) => ({
+      object: "block", type: "paragraph",
+      paragraph: { rich_text: [{ type: "text", text: { content: c } }] },
+    })),
+    { object: "block", type: "divider", divider: {} },
+  ];
+  const res = await fetch(`https://api.notion.com/v1/blocks/${NOTION_PAGE_ID}/children`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${NOTION_TOKEN}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ children }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Notion API ${res.status}: ${t.slice(0, 160)}`);
+  }
+  log("  ☁️ Notion に追記した");
+}
+
+// ローカル notes.md への追記と Notion 同期をまとめて行う(Notion失敗でも処理は継続)
+async function publishNote(title, body) {
+  appendNote(title, body);
+  try {
+    await notionAppend(title, body);
+  } catch (e) {
+    log(`  ⚠️ Notion 同期に失敗: ${e.message || e}`);
+  }
+}
+
+// ---------------- Gmail 連携(任意 / env が無ければ自動スキップ)----------------
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
+const REPORT_TO = process.env.REPORT_TO || GMAIL_USER; // 宛先未指定なら自分に送る
+const emailEnabled = () => Boolean(GMAIL_USER && GMAIL_PASS);
+
+async function sendReportEmail(text) {
+  if (!emailEnabled()) return;
+  if (DRY) { log("  [DRY] Gmail で送信(スキップ)"); return; }
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+  });
+  await transporter.sendMail({
+    from: `"${CONFIG.name}" <${GMAIL_USER}>`,
+    to: REPORT_TO,
+    subject: `[${CONFIG.name}] ${today()} の報告`,
+    text,
+  });
+  log(`  📧 ${REPORT_TO} に報告を送信した`);
+}
+
 // ---------------- ペルソナ & 意思決定 ----------------
 function personaBlock(s) {
   const mems = s.memories.slice(-10).map((m) => `・[${m.tag}] ${m.text}`).join("\n") || "・(まだない)";
@@ -237,7 +312,7 @@ async function doResearch(s, topic) {
     `最終行: 「次に気になること: ○○」を1つ\n` +
     `見出し・本文・最終行のみを出力。`;
   const text = await ask(s, prompt, { webSearch: true, maxTokens: 2500 });
-  appendNote(`調査「${t}」`, text);
+  await publishNote(`調査「${t}」`, text);
   s.topics = [...s.topics, t].slice(-40);
   s.desires.curiosity = clamp(s.desires.curiosity - 50);
   s.desires.boredom = clamp(s.desires.boredom - 10);
@@ -263,7 +338,7 @@ async function doDigest(s, night = false) {
     `\n\n以下は自分のリサーチノートの直近部分です:\n---\n${recent}\n---\n` +
     task;
   const text = await ask(s, prompt, { maxTokens: 800 });
-  appendNote(night ? "夜間の記憶整理" : "考察(ノートの消化)", text);
+  await publishNote(night ? "夜間の記憶整理" : "考察(ノートの消化)", text);
   s.desires.boredom = clamp(s.desires.boredom - 45);
   s.desires.energy = clamp(s.desires.energy - 8);
   if (night) {
@@ -289,6 +364,11 @@ async function doReport(s) {
   console.log("\n┌─────── 📮 " + CONFIG.name + "からの報告 ───────");
   console.log(text.trim().split("\n").map((l) => "│ " + l).join("\n"));
   console.log("└──────────────────────────────\n");
+  try {
+    await sendReportEmail(text.trim());
+  } catch (e) {
+    log(`  ⚠️ メール送信に失敗: ${e.message || e}`);
+  }
 }
 
 function doRest(s) {
@@ -398,6 +478,10 @@ function printStatus() {
     isNight()
       ? `🌙 夜間(記憶の整理のみ / 今夜 ${s.nightly && s.nightly.id === nightId() ? s.nightly.count : 0}/${CONFIG.night.maxDigests}回)`
       : "☀️ 日中(調査・考察・報告)"
+  );
+  console.log(
+    "連携      :",
+    `Notion ${notionEnabled() ? "ON" : "off"} / Gmail ${emailEnabled() ? "ON→" + REPORT_TO : "off"}`
   );
   console.log("直近の行動:");
   for (const m of s.memories.slice(-5)) {

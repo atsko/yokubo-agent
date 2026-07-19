@@ -2,10 +2,10 @@ name: yokubo-agent
 
 on:
   schedule:
-    # 30分ごと。※GitHubのcronは高負荷時に遅延・スキップします(数分〜数十分ずれることも)。
+    # 5分ごと。※GitHubのcronは高負荷時に遅延・スキップします(数分〜数十分ずれることも)。
     # agent.js は経過時間ベースで欲求を進めるので、間隔がブレても破綻しません。
     # コスト重視なら "*/15 * * * *" や "*/30 * * * *" に緩めてもほぼ同じ挙動になります。
-    - cron: "*/30 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}   # 手動実行(Actionsタブの Run workflow ボタン)
 
 # 状態ファイルへの書き込みが衝突しないよう、同時実行を1本に制限
@@ -36,6 +36,12 @@ jobs:
       - name: エージェントを1ティック実行
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # 任意連携(未設定なら自動でスキップされます)
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          REPORT_TO: ${{ secrets.REPORT_TO }}
           TZ: Asia/Tokyo   # 夜間モード(22-8時)を日本時間で判定させる
         run: node agent.js --tick
 

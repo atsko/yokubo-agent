@@ -1,8 +1,8 @@
 {
   "desires": {
     "curiosity": 100,
-    "boredom": 82,
-    "social": 97.99999999999997,
+    "boredom": 95.297824,
+    "social": 100,
     "energy": 100
   },
   "memories": [
@@ -132,7 +132,7 @@
     "抽出収率(EY)とフレーバー知覚の関係——過抽出・未抽出の味覚的特徴と閾値"
   ],
   "lastAuto": 1784650207101,
-  "lastTick": 1784669781728,
+  "lastTick": 1784673106184,
   "daily": {
     "date": "2026-07-22",
     "count": 1

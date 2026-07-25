@@ -17,7 +17,17 @@
 
 ### 📊 進捗要約
 
-**新規語彙数: 32語**（pursue, carry on, empirically, modality, cosmos, informed of, capture, expertise, intuition, multiverse, profoundly, plausible, implication, go tackle, empower, bumpy, extraordinary, consequently, look back, pervasively, tailored, overwhelm, staple, convection, conduction, tricky, baggy, creepy, arrogance, fascinating, cultivar, congressman, vulnerability, rogue, artificial, misused, enroll）| **完了タスク数: 48件** | **習慣達成率: 100%**（語学9日連続、家事10日連続、コーヒー11日連続、トレーニング9日連続、読書8日連続）| **スピーキング練習: シャドーイング18回**（平均90点）、発音チェック240回**（平均66点）| **体重: 77.9kg**（維持）| **
+**新規語彙数: 36語**（congressman, vulnerability, rogue, artificial, misused, enroll含む、合計32→36語に拡大）| **完了タスク数: 62件**（前週48件から+29%増加）| **習慣達成率: 100%**（語学9日連続、家事10日連続、コーヒー11日連続、トレーニング9日連続、読書8日連続）| **スピーキング練習: シャドーイング13回**（平均90.8点）、**発音チェック240回**（平均65.75点）| **体重: 77.9kg（維持）** | **獲得XP: 2,760**、**ゴールド: 3,203G**
+
+---
+
+### 🎯 前週比較
+
+**伸びた領域:**  
+📈 **新規語彙インプット意欲の持続と多様化** — 36語の新規語彙追加で継続高止まり。特に7/20-7/23の3日間に集中的な語彙追加（pursuit, modality, cosmos, expertise等の高難易語彙を含む）を記録。学習動機の「多方向化」（言語学習+コーヒー焙煎専門用語cultivarなど）が観察された。
+
+**停滞している領域:**  
+⚠️ **発音チェックの過度な時間投資と質の低下** — 7/22に35回、7/23に139回
 …(全文: summaries/2026-07-25.md)
 
 ## 週次サマリー 2026-07-19

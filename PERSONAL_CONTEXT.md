@@ -1,4 +1,4 @@
-# 個人コンテキスト(最終更新: 2026-07-19 / weekly.js が毎週自動更新)
+# 個人コンテキスト(最終更新: 2026-07-25 / weekly.js が毎週自動更新)
 
 任意のAIとの対話冒頭に、このファイルと CLAUDE.md を貼って使う。
 
@@ -8,11 +8,18 @@
 関心領域: スペシャルティコーヒー焙煎(Aillio実機・仲村式メソッド)、英語学習(CEFR B1→B2、シャドーイング/スピーキング)、ゲーミフィケーション(DQM・たまごっち風)。
 
 ## 進行中プロジェクト(直近7日の活動量)
-- vocab-tracker: 直近7日 15件(最終活動 2026-07-16T11:25:00.000+00:00)
-- maruta: 直近7日 64件(最終活動 2026-07-19T11:20:00.000+00:00)
-- speaking-levelup: 直近7日 4件(最終活動 2026-07-18T01:49:00.000+00:00)
+- maruta: 直近7日 98件(最終活動 2026-07-25T09:53:00.000+00:00)
+- speaking-levelup: 直近7日 8件(最終活動 2026-07-25T09:52:00.000+00:00)
+- vocab-tracker: 直近7日 37件(最終活動 2026-07-25T09:01:00.000+00:00)
 
 ## 直近の週次サマリー(最新3件)
+## 週次サマリー 2026-07-25
+
+### 📊 進捗要約
+
+**新規語彙数: 32語**（pursue, carry on, empirically, modality, cosmos, informed of, capture, expertise, intuition, multiverse, profoundly, plausible, implication, go tackle, empower, bumpy, extraordinary, consequently, look back, pervasively, tailored, overwhelm, staple, convection, conduction, tricky, baggy, creepy, arrogance, fascinating, cultivar, congressman, vulnerability, rogue, artificial, misused, enroll）| **完了タスク数: 48件** | **習慣達成率: 100%**（語学9日連続、家事10日連続、コーヒー11日連続、トレーニング9日連続、読書8日連続）| **スピーキング練習: シャドーイング18回**（平均90点）、発音チェック240回**（平均66点）| **体重: 77.9kg**（維持）| **
+…(全文: summaries/2026-07-25.md)
+
 ## 週次サマリー 2026-07-19
 
 ### 📊 進捗要約

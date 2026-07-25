@@ -1,0 +1,9 @@
+# 改行コードをリポジトリ内では常に LF に固定する。
+# これがないと Windows のエディタが CRLF で保存した瞬間、
+# 中身が同じでも全行が「変更」扱いになり、tick が push した data/ と激しく衝突する。
+* text=auto eol=lf
+
+# バイナリは対象外
+*.png binary
+*.jpg binary
+*.ico binary

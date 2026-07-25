@@ -52,9 +52,18 @@ jobs:
           git add data/
           if git diff --staged --quiet; then
             echo "変化なし(行動しなかった)ためコミットせず"
-          else
-            git commit -m "🥚 tick $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
-            # 別ランと衝突した場合に備えてリベースしてから push
-            git pull --rebase --autostash origin ${GITHUB_REF_NAME} || true
-            git push
+            exit 0
           fi
+          git commit -m "🥚 tick $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
+          # 別ランと衝突した場合に備えて rebase → push をリトライ
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "push 成功 (試行 ${i} 回目)"
+              exit 0
+            fi
+            echo "push が弾かれた。${i} 回目のリトライ..."
+            sleep $((i * 5))
+          done
+          echo "5回試しても push できなかった" >&2
+          exit 1

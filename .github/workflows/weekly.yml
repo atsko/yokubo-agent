@@ -9,6 +9,14 @@ on:
     - cron: "0 12 * * 0" # 日曜 21:00 JST(GitHubのcronは数十分遅れることがある)
   workflow_dispatch: # Actionsタブから手動実行も可(初回確認用)
 
+# agent.yml の tick と「同じグループ」に入れて直列化する。
+# これがないと 5分ごとの tick と weekly が同時に走り、data/ と summaries/ の
+# push が競合して非fast-forwardで落ちる。
+# agent.js は経過時間ベースなので、tick が数回スキップされても破綻しない。
+concurrency:
+  group: yokubo-agent
+  cancel-in-progress: false
+
 jobs:
   weekly:
     runs-on: ubuntu-latest
@@ -38,10 +46,31 @@ jobs:
 
       - name: Commit results
         run: |
+          set -euo pipefail
           git config user.name "yokubo-weekly"
           git config user.email "actions@users.noreply.github.com"
-          git add summaries/ PERSONAL_CONTEXT.md
-          git diff --cached --quiet || git commit -m "weekly: $(date -u +%F) のサマリーとコンテキスト更新"
-          # agent.yml の tick と衝突した場合に備えてリベースしてから push
-          git pull --rebase --autostash origin ${GITHUB_REF_NAME} || true
-          git push
+
+          # summaries/ は初回実行前は存在しないので、無いまま git add すると
+          # pathspec エラーでジョブごと落ちる。先に掘っておく。
+          mkdir -p summaries
+          git add -A summaries PERSONAL_CONTEXT.md
+
+          if git diff --cached --quiet; then
+            echo "変化なし。コミットせず終了"
+            exit 0
+          fi
+          git commit -m "weekly: $(date -u +%F) のサマリーとコンテキスト更新 [skip ci]"
+
+          # concurrency で直列化してあるが、手元からの push などと重なる可能性は残るので
+          # rebase → push を最大5回リトライする(|| true で握りつぶさない)
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "push 成功 (試行 ${i} 回目)"
+              exit 0
+            fi
+            echo "push が弾かれた。${i} 回目のリトライ..."
+            sleep $((i * 5))
+          done
+          echo "5回試しても push できなかった" >&2
+          exit 1
